@@ -40,26 +40,11 @@
         // 检测并生成标题列表（只显示存在的文件，按修改时间排序）
         async function generateTitleList() {
             const titleList = document.getElementById('title-list');
+            const maxFiles = 100; // 最多检测100个文件
             
-            // 定义所有可能的文件名列表（用户可以在这里添加新的文件名）
-            // 文件名应该是有意义的名称，例如：关于生活.md、关于成长.md 等
-            // 注意：文件名不需要包含 .md 扩展名
-            const possibleFiles = [
-                'AI应用',
-                '旅行web+app端',
-                '酒馆想法',
-                '女性主义思考',
-                '末世文想法',
-                'AI分身',
-                '学习笔记',
-                '车子分析',
-                '高中数学教学'
-                // 用户可以在这里继续添加更多文件名
-            ];
-            
-            // 快速检查文件是否存在并获取修改时间
-            async function checkFile(filename) {
-                const path = `markdown/thought/${filename}.md`;
+            // 快速检查文件是否存在并获取修改时间（使用 HEAD 请求）
+            async function quickCheckFile(index) {
+                const path = `markdown/thought/${index}.md`;
                 try {
                     const response = await fetch(path, { method: 'HEAD' });
                     if (response.ok) {
@@ -75,19 +60,27 @@
             }
             
             // 获取文件信息（包括标题和修改时间）
-            async function getFileInfo(filename) {
-                const path = `markdown/thought/${filename}.md`;
+            async function getFileInfo(index) {
+                const path = `markdown/thought/${index}.md`;
                 try {
                     const response = await fetch(path);
                     if (response.ok) {
-                        // 使用文件名作为标题（去除 .md 扩展名）
-                        const title = filename;
+                        const text = await response.text();
+                        // 提取第一行作为标题（去除 # 和空格）
+                        const firstLine = text.split('\n')[0].trim();
+                        let title = firstLine.startsWith('#') 
+                            ? firstLine.substring(1).trim() 
+                            : firstLine;
+                        // 如果标题为空，使用默认标题
+                        if (!title || title.length === 0) {
+                            title = `思考${index}`;
+                        }
                         
                         // 获取修改时间
                         const lastModified = response.headers.get('Last-Modified');
                         const modifiedTime = lastModified ? new Date(lastModified).getTime() : Date.now();
                         
-                        return { filename, title, path, modifiedTime };
+                        return { index, title, path, modifiedTime };
                     }
                 } catch (error) {
                     // 文件不存在或加载失败
@@ -96,12 +89,12 @@
             }
             
             // 创建标题列表项
-            function createTitleItem({ filename, title, path, modifiedTime }) {
+            function createTitleItem({ index, title, path, modifiedTime }) {
                 const titleItem = document.createElement('div');
                 titleItem.className = 'title-item';
                 titleItem.textContent = title;
                 titleItem.setAttribute('data-path', path);
-                titleItem.setAttribute('data-filename', filename);
+                titleItem.setAttribute('data-index', index);
                 titleItem.setAttribute('data-modified', modifiedTime);
                 
                 titleItem.addEventListener('click', function() {
@@ -121,22 +114,47 @@
                 return titleItem;
             }
             
-            // 并行检测所有文件的存在性和修改时间
-            const fileChecks = await Promise.all(
-                possibleFiles.map(async (filename) => {
-                    const check = await checkFile(filename);
-                    if (check.exists) {
-                        return { filename, modifiedTime: check.modifiedTime, path: check.path };
+            // 优先快速检测前10个文件，找到第一个就立即加载
+            let firstFileLoaded = false;
+            const existingFiles = [];
+            
+            for (let i = 1; i <= 10 && !firstFileLoaded; i++) {
+                const check = await quickCheckFile(i);
+                if (check.exists) {
+                    const fileInfo = await getFileInfo(i);
+                    if (fileInfo) {
+                        existingFiles.push(fileInfo);
+                        const firstItem = createTitleItem(fileInfo);
+                        firstItem.classList.add('active');
+                        titleList.appendChild(firstItem);
+                        loadMarkdown(fileInfo.path);
+                        firstFileLoaded = true;
+                        break; // 找到第一个就停止
                     }
-                    return null;
-                })
-            );
+                }
+            }
             
-            // 过滤出存在的文件
-            const existingFileChecks = fileChecks.filter(f => f !== null);
+            // 如果前10个都没有找到，继续检测更多文件（但只检测到找到第一个为止）
+            if (!firstFileLoaded) {
+                for (let i = 11; i <= maxFiles && !firstFileLoaded; i++) {
+                    const check = await quickCheckFile(i);
+                    if (check.exists) {
+                        const fileInfo = await getFileInfo(i);
+                        if (fileInfo) {
+                            existingFiles.push(fileInfo);
+                            const firstItem = createTitleItem(fileInfo);
+                            firstItem.classList.add('active');
+                            titleList.appendChild(firstItem);
+                            loadMarkdown(fileInfo.path);
+                            firstFileLoaded = true;
+                            break;
+                        }
+                    }
+                }
+            }
             
             // 如果没有任何文件，显示提示
-            if (existingFileChecks.length === 0) {
+            if (existingFiles.length === 0) {
                 const emptyMsg = document.createElement('div');
                 emptyMsg.className = 'title-item';
                 emptyMsg.textContent = '暂无思考文章';
@@ -146,42 +164,44 @@
                 return;
             }
             
-            // 按修改时间排序（最新的在前）
-            existingFileChecks.sort((a, b) => b.modifiedTime - a.modifiedTime);
-            
-            // 加载所有文件的信息
-            const allFileInfos = [];
-            for (const fileCheck of existingFileChecks) {
-                const fileInfo = await getFileInfo(fileCheck.filename);
-                if (fileInfo) {
-                    allFileInfos.push(fileInfo);
+            // 异步检测剩余文件（不阻塞初始显示）
+            setTimeout(async () => {
+                const checkedIndices = new Set(existingFiles.map(f => f.index));
+                
+                for (let i = 1; i <= maxFiles; i++) {
+                    // 跳过已经检测过的文件
+                    if (checkedIndices.has(i)) continue;
+                    
+                    const check = await quickCheckFile(i);
+                    if (check.exists) {
+                        const fileInfo = await getFileInfo(i);
+                        if (fileInfo) {
+                            existingFiles.push(fileInfo);
+                            checkedIndices.add(i);
+                        }
+                    }
                 }
-            }
-            
-            // 按修改时间排序（最新的在前）
-            allFileInfos.sort((a, b) => b.modifiedTime - a.modifiedTime);
-            
-            // 如果没有任何文件，显示提示
-            if (allFileInfos.length === 0) {
-                const emptyMsg = document.createElement('div');
-                emptyMsg.className = 'title-item';
-                emptyMsg.textContent = '暂无思考文章';
-                emptyMsg.style.color = '#999';
-                emptyMsg.style.cursor = 'default';
-                titleList.appendChild(emptyMsg);
-                return;
-            }
-            
-            // 创建并添加所有菜单项
-            allFileInfos.forEach((fileInfo, index) => {
-                const item = createTitleItem(fileInfo);
-                // 第一个文件（最新修改的）设为激活状态
-                if (index === 0) {
-                    item.classList.add('active');
-                    loadMarkdown(fileInfo.path);
-                }
-                titleList.appendChild(item);
-            });
+                
+                // 按修改时间排序（最新的在前）
+                existingFiles.sort((a, b) => b.modifiedTime - a.modifiedTime);
+                
+                // 保存当前激活的文件路径
+                const activeItem = titleList.querySelector('.title-item.active');
+                const activePath = activeItem ? activeItem.getAttribute('data-path') : null;
+                
+                // 清空列表
+                titleList.innerHTML = '';
+                
+                // 重新创建并添加所有菜单项（按修改时间排序）
+                existingFiles.forEach(fileInfo => {
+                    const item = createTitleItem(fileInfo);
+                    // 恢复激活状态
+                    if (fileInfo.path === activePath) {
+                        item.classList.add('active');
+                    }
+                    titleList.appendChild(item);
+                });
+            }, 100);
         }
         
         function loadMarkdown(path) {
@@ -209,3 +229,4 @@
     </script>
 </body>
 </html>
+
