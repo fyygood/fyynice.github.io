@@ -94,6 +94,9 @@
                 return;
             }
             
+            // 按索引从大到小排序（假设索引越大越新）
+            existingFiles.sort((a, b) => b.index - a.index);
+            
             // 创建标题列表项
             existingFiles.forEach(({ index, title, path }) => {
                 const titleItem = document.createElement('div');
@@ -118,6 +121,18 @@
                 
                 titleList.appendChild(titleItem);
             });
+            
+            // 默认加载最新的文件（索引最大的）
+            if (existingFiles.length > 0) {
+                const latestFile = existingFiles[0]; // 已经按索引从大到小排序，第一个就是最新的
+                const latestItem = titleList.querySelector(`[data-index="${latestFile.index}"]`);
+                if (latestItem) {
+                    // 激活最新文件的菜单项
+                    latestItem.classList.add('active');
+                    // 加载最新文件的内容
+                    loadMarkdown(latestFile.path);
+                }
+            }
         }
         
         function loadMarkdown(path) {
