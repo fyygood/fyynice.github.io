@@ -43,9 +43,21 @@
             const titleList = document.getElementById('title-list');
             const maxFiles = 50; // 最多检测50个文件
             const existingFiles = [];
+            let firstFileLoaded = false;
             
-            // 检测文件是否存在并获取标题
-            async function checkFileExists(index) {
+            // 快速检测文件是否存在（使用HEAD请求，更轻量）
+            async function quickCheckFile(index) {
+                const path = `markdown/thought/${index}.md`;
+                try {
+                    const response = await fetch(path, { method: 'HEAD' });
+                    return response.ok;
+                } catch (error) {
+                    return false;
+                }
+            }
+            
+            // 获取文件内容和标题
+            async function getFileInfo(index) {
                 const path = `markdown/thought/${index}.md`;
                 try {
                     const response = await fetch(path);
@@ -68,37 +80,8 @@
                 return null;
             }
             
-            // 并行检测所有文件
-            const checkPromises = [];
-            for (let i = 1; i <= maxFiles; i++) {
-                checkPromises.push(checkFileExists(i));
-            }
-            
-            const results = await Promise.all(checkPromises);
-            
-            // 过滤出存在的文件
-            results.forEach(result => {
-                if (result) {
-                    existingFiles.push(result);
-                }
-            });
-            
-            // 如果没有任何文件，显示提示
-            if (existingFiles.length === 0) {
-                const emptyMsg = document.createElement('div');
-                emptyMsg.className = 'title-item';
-                emptyMsg.textContent = '暂无思考文章';
-                emptyMsg.style.color = '#999';
-                emptyMsg.style.cursor = 'default';
-                titleList.appendChild(emptyMsg);
-                return;
-            }
-            
-            // 按索引从小到大排序（第一个就是索引最小的）
-            existingFiles.sort((a, b) => a.index - b.index);
-            
             // 创建标题列表项
-            existingFiles.forEach(({ index, title, path }) => {
+            function createTitleItem({ index, title, path }) {
                 const titleItem = document.createElement('div');
                 titleItem.className = 'title-item';
                 titleItem.textContent = title;
@@ -120,19 +103,110 @@
                 });
                 
                 titleList.appendChild(titleItem);
-            });
+                return titleItem;
+            }
             
-            // 默认加载第一个文件（索引最小的）
-            if (existingFiles.length > 0) {
-                const firstFile = existingFiles[0]; // 已经按索引从小到大排序，第一个就是索引最小的
-                const firstItem = titleList.querySelector(`[data-index="${firstFile.index}"]`);
-                if (firstItem) {
-                    // 激活第一个文件的菜单项
-                    firstItem.classList.add('active');
-                    // 加载第一个文件的内容
-                    loadMarkdown(firstFile.path);
+            // 优先快速检测前10个文件，找到第一个就立即加载
+            for (let i = 1; i <= 10 && !firstFileLoaded; i++) {
+                const exists = await quickCheckFile(i);
+                if (exists) {
+                    const fileInfo = await getFileInfo(i);
+                    if (fileInfo) {
+                        existingFiles.push(fileInfo);
+                        const firstItem = createTitleItem(fileInfo);
+                        firstItem.classList.add('active');
+                        loadMarkdown(fileInfo.path);
+                        firstFileLoaded = true;
+                        break; // 找到第一个就停止
+                    }
                 }
             }
+            
+            // 如果前10个都没有找到，继续检测更多文件（但只检测到找到第一个为止）
+            if (!firstFileLoaded) {
+                for (let i = 11; i <= maxFiles && !firstFileLoaded; i++) {
+                    const exists = await quickCheckFile(i);
+                    if (exists) {
+                        const fileInfo = await getFileInfo(i);
+                        if (fileInfo) {
+                            existingFiles.push(fileInfo);
+                            const firstItem = createTitleItem(fileInfo);
+                            firstItem.classList.add('active');
+                            loadMarkdown(fileInfo.path);
+                            firstFileLoaded = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // 如果没有任何文件，显示提示
+            if (existingFiles.length === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'title-item';
+                emptyMsg.textContent = '暂无思考文章';
+                emptyMsg.style.color = '#999';
+                emptyMsg.style.cursor = 'default';
+                titleList.appendChild(emptyMsg);
+                return;
+            }
+            
+            // 按索引从小到大排序菜单项
+            const items = Array.from(titleList.querySelectorAll('.title-item'));
+            items.sort((a, b) => {
+                const indexA = parseInt(a.getAttribute('data-index'));
+                const indexB = parseInt(b.getAttribute('data-index'));
+                return indexA - indexB;
+            });
+            titleList.innerHTML = '';
+            items.forEach(item => titleList.appendChild(item));
+            
+            // 确保第一个文件是激活状态
+            if (items.length > 0) {
+                const firstItem = items[0];
+                if (!firstItem.classList.contains('active')) {
+                    firstItem.classList.add('active');
+                    loadMarkdown(firstItem.getAttribute('data-path'));
+                }
+            }
+            
+            // 异步检测剩余文件（不阻塞初始显示）
+            setTimeout(async () => {
+                const checkedIndices = new Set(existingFiles.map(f => f.index));
+                
+                for (let i = 1; i <= maxFiles; i++) {
+                    // 跳过已经检测过的文件
+                    if (checkedIndices.has(i)) continue;
+                    
+                    const exists = await quickCheckFile(i);
+                    if (exists) {
+                        const fileInfo = await getFileInfo(i);
+                        if (fileInfo) {
+                            existingFiles.push(fileInfo);
+                            createTitleItem(fileInfo);
+                            checkedIndices.add(i);
+                            
+                            // 重新排序菜单项
+                            const allItems = Array.from(titleList.querySelectorAll('.title-item'));
+                            allItems.sort((a, b) => {
+                                const indexA = parseInt(a.getAttribute('data-index'));
+                                const indexB = parseInt(b.getAttribute('data-index'));
+                                return indexA - indexB;
+                            });
+                            titleList.innerHTML = '';
+                            allItems.forEach(item => titleList.appendChild(item));
+                            
+                            // 保持第一个文件的激活状态
+                            if (allItems.length > 0 && !allItems[0].classList.contains('active')) {
+                                document.querySelectorAll('.title-item').forEach(item => {
+                                    item.classList.remove('active');
+                                });
+                                allItems[0].classList.add('active');
+                            }
+                        }
+                    }
+                }
+            }, 100);
         }
         
         function loadMarkdown(path) {
@@ -153,3 +227,4 @@
     </script>
 </body>
 </html>
+
