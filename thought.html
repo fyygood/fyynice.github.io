@@ -114,40 +114,28 @@
                 return titleItem;
             }
             
-            // 优先快速检测前10个文件，找到第一个就立即加载
-            let firstFileLoaded = false;
+            // 检测所有文件
             const existingFiles = [];
             
-            for (let i = 1; i <= 10 && !firstFileLoaded; i++) {
+            // 检测前10个文件
+            for (let i = 1; i <= 10; i++) {
                 const check = await quickCheckFile(i);
                 if (check.exists) {
                     const fileInfo = await getFileInfo(i);
                     if (fileInfo) {
                         existingFiles.push(fileInfo);
-                        const firstItem = createTitleItem(fileInfo);
-                        firstItem.classList.add('active');
-                        titleList.appendChild(firstItem);
-                        loadMarkdown(fileInfo.path);
-                        firstFileLoaded = true;
-                        break; // 找到第一个就停止
                     }
                 }
             }
             
-            // 如果前10个都没有找到，继续检测更多文件（但只检测到找到第一个为止）
-            if (!firstFileLoaded) {
-                for (let i = 11; i <= maxFiles && !firstFileLoaded; i++) {
+            // 如果前10个都没有找到，继续检测更多文件
+            if (existingFiles.length === 0) {
+                for (let i = 11; i <= maxFiles; i++) {
                     const check = await quickCheckFile(i);
                     if (check.exists) {
                         const fileInfo = await getFileInfo(i);
                         if (fileInfo) {
                             existingFiles.push(fileInfo);
-                            const firstItem = createTitleItem(fileInfo);
-                            firstItem.classList.add('active');
-                            titleList.appendChild(firstItem);
-                            loadMarkdown(fileInfo.path);
-                            firstFileLoaded = true;
-                            break;
                         }
                     }
                 }
@@ -164,44 +152,19 @@
                 return;
             }
             
-            // 异步检测剩余文件（不阻塞初始显示）
-            setTimeout(async () => {
-                const checkedIndices = new Set(existingFiles.map(f => f.index));
-                
-                for (let i = 1; i <= maxFiles; i++) {
-                    // 跳过已经检测过的文件
-                    if (checkedIndices.has(i)) continue;
-                    
-                    const check = await quickCheckFile(i);
-                    if (check.exists) {
-                        const fileInfo = await getFileInfo(i);
-                        if (fileInfo) {
-                            existingFiles.push(fileInfo);
-                            checkedIndices.add(i);
-                        }
-                    }
+            // 按修改时间排序（最新的在前）
+            existingFiles.sort((a, b) => b.modifiedTime - a.modifiedTime);
+            
+            // 创建并添加所有菜单项（按修改时间排序）
+            existingFiles.forEach((fileInfo, index) => {
+                const item = createTitleItem(fileInfo);
+                // 第一个文件（最新修改的）设为激活状态并加载
+                if (index === 0) {
+                    item.classList.add('active');
+                    loadMarkdown(fileInfo.path);
                 }
-                
-                // 按修改时间排序（最新的在前）
-                existingFiles.sort((a, b) => b.modifiedTime - a.modifiedTime);
-                
-                // 保存当前激活的文件路径
-                const activeItem = titleList.querySelector('.title-item.active');
-                const activePath = activeItem ? activeItem.getAttribute('data-path') : null;
-                
-                // 清空列表
-                titleList.innerHTML = '';
-                
-                // 重新创建并添加所有菜单项（按修改时间排序）
-                existingFiles.forEach(fileInfo => {
-                    const item = createTitleItem(fileInfo);
-                    // 恢复激活状态
-                    if (fileInfo.path === activePath) {
-                        item.classList.add('active');
-                    }
-                    titleList.appendChild(item);
-                });
-            }, 100);
+                titleList.appendChild(item);
+            });
         }
         
         function loadMarkdown(path) {
