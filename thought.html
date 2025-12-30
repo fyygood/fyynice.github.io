@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>饭歪歪 - 思考</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="images/image1.jpg" alt="头像" class="header-avatar">
+            <h1>饭歪歪</h1>
+            <span class="house-icon">🏠</span>
+        </div>
+        <nav class="header-nav">
+            <a href="index.html" class="nav-item">首页</a>
+            <a href="log.html" class="nav-item">日志</a>
+            <a href="todo.html" class="nav-item">to do</a>
+            <a href="growth.html" class="nav-item">成长</a>
+            <a href="thought.html" class="nav-item active">思考</a>
+        </nav>
+    </header>
+
+    <main class="thought-main">
+        <aside class="thought-sidebar">
+            <div class="title-list" id="title-list">
+                <!-- 标题列表将通过 JavaScript 动态生成 -->
+            </div>
+        </aside>
+        <div class="thought-content">
+            <div class="markdown-container" id="markdown-content">
+                <p>markdown 文件</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/marked.min.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        // 检测并生成标题列表（只显示存在的文件）
+        async function generateTitleList() {
+            const titleList = document.getElementById('title-list');
+            const maxFiles = 50; // 最多检测50个文件
+            const existingFiles = [];
+            
+            // 检测文件是否存在并获取标题
+            async function checkFileExists(index) {
+                const path = `markdown/thought/${index}.md`;
+                try {
+                    const response = await fetch(path);
+                    if (response.ok) {
+                        const text = await response.text();
+                        // 提取第一行作为标题（去除 # 和空格）
+                        const firstLine = text.split('\n')[0].trim();
+                        let title = firstLine.startsWith('#') 
+                            ? firstLine.substring(1).trim() 
+                            : firstLine;
+                        // 如果标题为空，使用默认标题
+                        if (!title || title.length === 0) {
+                            title = `思考${index}`;
+                        }
+                        return { index, title, path };
+                    }
+                } catch (error) {
+                    // 文件不存在或加载失败
+                }
+                return null;
+            }
+            
+            // 并行检测所有文件
+            const checkPromises = [];
+            for (let i = 1; i <= maxFiles; i++) {
+                checkPromises.push(checkFileExists(i));
+            }
+            
+            const results = await Promise.all(checkPromises);
+            
+            // 过滤出存在的文件
+            results.forEach(result => {
+                if (result) {
+                    existingFiles.push(result);
+                }
+            });
+            
+            // 如果没有任何文件，显示提示
+            if (existingFiles.length === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'title-item';
+                emptyMsg.textContent = '暂无思考文章';
+                emptyMsg.style.color = '#999';
+                emptyMsg.style.cursor = 'default';
+                titleList.appendChild(emptyMsg);
+                return;
+            }
+            
+            // 创建标题列表项
+            existingFiles.forEach(({ index, title, path }) => {
+                const titleItem = document.createElement('div');
+                titleItem.className = 'title-item';
+                titleItem.textContent = title;
+                titleItem.setAttribute('data-path', path);
+                titleItem.setAttribute('data-index', index);
+                
+                titleItem.addEventListener('click', function() {
+                    // 移除之前的激活状态
+                    document.querySelectorAll('.title-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    
+                    // 添加当前激活状态
+                    this.classList.add('active');
+                    
+                    // 加载 Markdown 文件
+                    const filePath = this.getAttribute('data-path');
+                    loadMarkdown(filePath);
+                });
+                
+                titleList.appendChild(titleItem);
+            });
+        }
+        
+        function loadMarkdown(path) {
+            fetch(path)
+                .then(response => {
+                    if (!response.ok) throw new Error('文件不存在');
+                    return response.text();
+                })
+                .then(text => {
+                    document.getElementById('markdown-content').innerHTML = marked.parse(text);
+                })
+                .catch(error => {
+                    document.getElementById('markdown-content').innerHTML = '<p>markdown 文件</p>';
+                });
+        }
+        
+        generateTitleList();
+    </script>
+</body>
+</html>
+

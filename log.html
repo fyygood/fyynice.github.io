@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>饭歪歪 - 日志</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="images/image1.jpg" alt="头像" class="header-avatar">
+            <h1>饭歪歪</h1>
+            <span class="house-icon">🏠</span>
+        </div>
+        <nav class="header-nav">
+            <a href="index.html" class="nav-item">首页</a>
+            <a href="log.html" class="nav-item active">日志</a>
+            <a href="todo.html" class="nav-item">to do</a>
+            <a href="growth.html" class="nav-item">成长</a>
+            <a href="thought.html" class="nav-item">思考</a>
+        </nav>
+    </header>
+
+    <main class="log-main">
+        <aside class="log-sidebar">
+            <div class="date-list" id="date-list">
+                <!-- 日期列表将通过 JavaScript 动态生成 -->
+            </div>
+        </aside>
+        <div class="log-content">
+            <div class="markdown-container" id="markdown-content">
+                <p>markdown 文件</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/marked.min.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        // 生成日期列表（从2025.12.29开始，只显示到今天的日期）
+        function generateDateList() {
+            const dateList = document.getElementById('date-list');
+            const startDate = new Date('2025-12-29');
+            const today = new Date();
+            today.setHours(23, 59, 59, 999); // 设置为今天的最后一刻，确保包含今天
+            
+            // 生成从开始日期到今天（包含今天）的日期列表
+            const dates = [];
+            const currentDate = new Date(startDate);
+            
+            while (currentDate <= today) {
+                dates.push(new Date(currentDate));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            // 按日期倒序排列（最新的日期在最上面）
+            dates.reverse();
+            
+            // 获取今天的日期字符串
+            const todayYear = today.getFullYear();
+            const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+            const todayDay = String(today.getDate()).padStart(2, '0');
+            const todayDateStr = `${todayYear}.${todayMonth}.${todayDay}`;
+            
+            // 星期几的中文数组
+            const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            
+            let todayItem = null; // 用于保存今天的日期项
+            let currentMonth = null; // 用于跟踪当前月份，用于分组显示
+            
+            dates.forEach(date => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const dateStr = `${year}.${month}.${day}`;
+                const weekday = weekdays[date.getDay()]; // 获取星期几
+                
+                // 如果是新的月份，添加月份标题
+                const monthKey = `${year}.${month}`;
+                if (currentMonth !== monthKey) {
+                    currentMonth = monthKey;
+                    const monthHeader = document.createElement('div');
+                    monthHeader.className = 'date-month-header';
+                    monthHeader.textContent = `${year}年${parseInt(month)}月`;
+                    dateList.appendChild(monthHeader);
+                }
+                
+                const dateItem = document.createElement('div');
+                dateItem.className = 'date-item';
+                // 显示格式：日期 + 星期几，例如：12.29 周一
+                dateItem.textContent = `${month}.${day} ${weekday}`;
+                dateItem.setAttribute('data-date', dateStr); // 添加data-date属性，用于加载文件
+                dateItem.setAttribute('title', dateStr); // 添加完整日期作为提示
+                
+                // 如果是今天的日期，保存引用
+                if (dateStr === todayDateStr) {
+                    todayItem = dateItem;
+                }
+                
+                dateItem.addEventListener('click', function() {
+                    // 移除之前的激活状态
+                    document.querySelectorAll('.date-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    
+                    // 添加当前激活状态
+                    this.classList.add('active');
+                    
+                    // 加载 Markdown 文件
+                    loadMarkdown('markdown/log/' + dateStr + '.md');
+                });
+                dateList.appendChild(dateItem);
+            });
+            
+            // 默认加载今天的日期
+            if (todayItem) {
+                // 激活今天的日期项
+                todayItem.classList.add('active');
+                // 加载今天的 Markdown 文件
+                loadMarkdown('markdown/log/' + todayDateStr + '.md');
+                // 滚动到今天的日期项（可选，让用户能看到选中的项）
+                todayItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        function loadMarkdown(path) {
+            fetch(path)
+                .then(response => {
+                    if (!response.ok) throw new Error('文件不存在');
+                    return response.text();
+                })
+                .then(text => {
+                    document.getElementById('markdown-content').innerHTML = marked.parse(text);
+                })
+                .catch(error => {
+                    document.getElementById('markdown-content').innerHTML = '<p>markdown 文件</p>';
+                });
+        }
+        
+        generateDateList();
+    </script>
+</body>
+</html>
+

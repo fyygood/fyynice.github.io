@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>饭歪歪 - 成长</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="images/image1.jpg" alt="头像" class="header-avatar">
+            <h1>饭歪歪</h1>
+            <span class="house-icon">🏠</span>
+        </div>
+        <nav class="header-nav">
+            <a href="index.html" class="nav-item">首页</a>
+            <a href="log.html" class="nav-item">日志</a>
+            <a href="todo.html" class="nav-item">to do</a>
+            <a href="growth.html" class="nav-item active">成长</a>
+            <a href="thought.html" class="nav-item">思考</a>
+        </nav>
+    </header>
+
+    <main class="growth-main">
+        <aside class="growth-sidebar">
+            <div class="category-list">
+                <div class="category-item">
+                    <div class="category-title">生日</div>
+                    <div class="subcategory">
+                        <div class="subcategory-item" data-file="birthday-family.md">家庭</div>
+                        <div class="subcategory-item" data-file="birthday-sick.md">生病</div>
+                        <div class="subcategory-item" data-file="birthday-play.md">出去玩</div>
+                    </div>
+                </div>
+                <div class="category-item">
+                    <div class="category-title">小学</div>
+                    <div class="subcategory">
+                        <div class="subcategory-item" data-file="primary-xinghua.md">兴华小学</div>
+                        <div class="subcategory-item" data-file="primary-qianxian.md">乾县某小学</div>
+                        <div class="subcategory-item" data-file="primary-shaanshida.md">陕师大附小</div>
+                    </div>
+                </div>
+                <div class="category-item">
+                    <div class="category-title">初中</div>
+                    <div class="subcategory">
+                        <div class="subcategory-item" data-file="middle-xigongda.md">西工大附中</div>
+                    </div>
+                </div>
+                <div class="category-item">
+                    <div class="category-title">高中</div>
+                    <div class="subcategory">
+                        <div class="subcategory-item" data-file="high-xigongda.md">西工大附中</div>
+                    </div>
+                </div>
+                <div class="category-item">
+                    <div class="category-title">大学</div>
+                    <div class="subcategory">
+                        <div class="subcategory-item" data-file="university-zhejiang.md">浙江大学</div>
+                    </div>
+                </div>
+                <div class="category-item">
+                    <div class="category-title">工作</div>
+                    <div class="subcategory">
+                        <div class="subcategory-item" data-file="work.md">工作经历</div>
+                    </div>
+                </div>
+                <div class="category-item">
+                    <div class="category-title">......</div>
+                </div>
+            </div>
+        </aside>
+        <div class="growth-content">
+            <!-- 密码锁界面 -->
+            <div class="lock-screen" id="lock-screen">
+                <div class="lock-container">
+                    <div class="lock-icon">🔒</div>
+                    <h3>请输入密码</h3>
+                    <input type="password" id="password-input" placeholder="输入密码" autocomplete="off">
+                    <button id="unlock-btn">解锁</button>
+                    <p class="error-message" id="error-message" style="display: none;">密码错误，请重试</p>
+                </div>
+            </div>
+            <!-- 欢迎信息 -->
+            <div class="welcome-message" id="welcome-message" style="display: none;">
+                <div class="welcome-content">
+                    <div class="welcome-emoji">🌟✨</div>
+                    <h2>非常欢迎你了解我的成长历程！</h2>
+                    <div class="welcome-emoji">💫🎉</div>
+                </div>
+            </div>
+            <!-- Markdown 内容区域 -->
+            <div class="markdown-container" id="markdown-content" style="display: none;">
+                <p>markdown 文件</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/marked.min.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        const PASSWORD = '0714'; // 静态密码
+        let isUnlocked = false;
+        
+        // 检查是否已经解锁（使用 sessionStorage）
+        if (sessionStorage.getItem('growth-unlocked') === 'true') {
+            isUnlocked = true;
+            // 如果已解锁，直接显示 markdown 内容区域，不显示欢迎信息
+            document.getElementById('lock-screen').style.display = 'none';
+            document.getElementById('welcome-message').style.display = 'none';
+            document.getElementById('markdown-content').style.display = 'block';
+            // 移除模糊效果
+            document.querySelectorAll('.subcategory-item').forEach(item => {
+                item.classList.remove('blurred');
+                item.style.opacity = '1';
+                item.style.cursor = 'pointer';
+            });
+            enableMenuItems();
+        }
+        
+        // 密码输入框实时检测密码（仅用于隐藏错误信息）
+        const passwordInput = document.getElementById('password-input');
+        passwordInput.addEventListener('input', function() {
+            const password = this.value;
+            const errorMsg = document.getElementById('error-message');
+            
+            // 如果正在输入，隐藏错误信息
+            if (password.length > 0 && password.length < PASSWORD.length) {
+                errorMsg.style.display = 'none';
+            }
+        });
+        
+        // 密码输入框回车解锁
+        passwordInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const password = this.value;
+                if (password === PASSWORD) {
+                    isUnlocked = true;
+                    sessionStorage.setItem('growth-unlocked', 'true');
+                    unlockPage();
+                } else {
+                    // 显示错误信息
+                    const errorMsg = document.getElementById('error-message');
+                    errorMsg.style.display = 'block';
+                    this.value = '';
+                    this.focus();
+                }
+            }
+        });
+        
+        // 解锁按钮点击事件
+        document.getElementById('unlock-btn').addEventListener('click', function() {
+            const password = passwordInput.value;
+            if (password === PASSWORD) {
+                isUnlocked = true;
+                sessionStorage.setItem('growth-unlocked', 'true');
+                unlockPage();
+            } else {
+                // 显示错误信息
+                const errorMsg = document.getElementById('error-message');
+                errorMsg.style.display = 'block';
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        });
+        
+        function unlockPage() {
+            // 隐藏锁屏界面
+            document.getElementById('lock-screen').style.display = 'none';
+            // 显示欢迎信息
+            const welcomeMessage = document.getElementById('welcome-message');
+            welcomeMessage.style.display = 'flex';
+            // 添加淡入动画
+            setTimeout(() => {
+                welcomeMessage.classList.add('show');
+            }, 10);
+            
+            // 移除模糊效果和旧的事件监听器
+            document.querySelectorAll('.subcategory-item').forEach(item => {
+                item.classList.remove('blurred');
+                item.style.opacity = '1';
+                item.style.cursor = 'pointer';
+                // 移除所有事件监听器：通过克隆节点来移除
+                const newItem = item.cloneNode(true);
+                item.parentNode.replaceChild(newItem, item);
+            });
+            // 启用左侧菜单
+            enableMenuItems();
+        }
+        
+        // 点击菜单项时隐藏欢迎信息，显示 markdown 内容
+        function showMarkdown() {
+            const welcomeMessage = document.getElementById('welcome-message');
+            const markdownContent = document.getElementById('markdown-content');
+            
+            welcomeMessage.classList.remove('show');
+            setTimeout(() => {
+                welcomeMessage.style.display = 'none';
+                markdownContent.style.display = 'block';
+            }, 300);
+        }
+        
+        function enableMenuItems() {
+            document.querySelectorAll('.subcategory-item').forEach(item => {
+                // 移除所有可能存在的旧事件监听器
+                item.onclick = null;
+                
+                item.addEventListener('click', function(e) {
+                    if (!isUnlocked) {
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // 移除之前的激活状态
+                    document.querySelectorAll('.subcategory-item').forEach(i => {
+                        i.classList.remove('active');
+                    });
+                    
+                    // 添加当前激活状态
+                    this.classList.add('active');
+                    
+                    // 隐藏欢迎信息，显示 markdown 内容
+                    showMarkdown();
+                    
+                    // 加载 Markdown 文件
+                    const file = this.getAttribute('data-file');
+                    loadMarkdown('markdown/growth/' + file);
+                });
+            });
+        }
+        
+        // 如果未解锁，禁用菜单项并添加模糊效果
+        if (!isUnlocked) {
+            document.querySelectorAll('.subcategory-item').forEach(item => {
+                item.classList.add('blurred');
+                item.style.cursor = 'not-allowed';
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('请先解锁页面');
+                });
+            });
+        } else {
+            enableMenuItems();
+        }
+        
+        function loadMarkdown(path) {
+            fetch(path)
+                .then(response => {
+                    if (!response.ok) throw new Error('文件不存在');
+                    return response.text();
+                })
+                .then(text => {
+                    document.getElementById('markdown-content').innerHTML = marked.parse(text);
+                })
+                .catch(error => {
+                    document.getElementById('markdown-content').innerHTML = '<p>markdown 文件</p>';
+                });
+        }
+    </script>
+</body>
+</html>
+

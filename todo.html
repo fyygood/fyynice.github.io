@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>饭歪歪 - to do</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="images/image1.jpg" alt="头像" class="header-avatar">
+            <h1>饭歪歪</h1>
+            <span class="house-icon">🏠</span>
+        </div>
+        <nav class="header-nav">
+            <a href="index.html" class="nav-item">首页</a>
+            <a href="log.html" class="nav-item">日志</a>
+            <a href="todo.html" class="nav-item active">to do</a>
+            <a href="growth.html" class="nav-item">成长</a>
+            <a href="thought.html" class="nav-item">思考</a>
+        </nav>
+    </header>
+
+    <main class="todo-main">
+        <div class="calendar-container" id="calendar">
+            <!-- 日历将通过 JavaScript 动态生成 -->
+        </div>
+        <div class="todo-detail" id="todo-detail" style="display: none;">
+            <div class="todo-list-container">
+                <div class="todo-header-section">
+                    <h3 id="selected-date-title"></h3>
+                    <p class="todo-date-subtitle" id="todo-date-subtitle"></p>
+                    <div class="todo-lock-section" id="todo-lock-section" style="display: none;">
+                        <button id="unlock-todo-btn" class="unlock-todo-btn">🔓 解锁编辑</button>
+                    </div>
+                </div>
+                <ul class="todo-list" id="todo-list">
+                    <!-- 任务列表 -->
+                </ul>
+                <div class="todo-input-section" id="todo-input-section" style="display: none;">
+                    <input type="text" id="new-todo" placeholder="添加新任务..." autocomplete="off">
+                    <button id="add-todo-btn" class="add-btn">➕</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 密码输入模态框 -->
+        <div class="todo-password-modal" id="todo-password-modal" style="display: none;">
+            <div class="todo-password-container">
+                <div class="lock-icon">🔒</div>
+                <h3>请输入密码以编辑任务</h3>
+                <input type="password" id="todo-password-input" placeholder="输入密码" autocomplete="off">
+                <div class="password-buttons">
+                    <button id="todo-password-confirm">确认</button>
+                    <button id="todo-password-cancel">取消</button>
+                </div>
+                <p class="error-message" id="todo-error-message" style="display: none;">密码错误，请重试</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/main.js"></script>
+    <script>
+        const TODO_PASSWORD = '0714'; // 编辑密码
+        let currentSelectedDate = null;
+        let isTodoUnlocked = false;
+        
+        // 检查是否已经解锁（使用 sessionStorage）
+        if (sessionStorage.getItem('todo-unlocked') === 'true') {
+            isTodoUnlocked = true;
+        }
+        
+        // 生成日历（从当周周一开始，显示5行x7列）
+        function generateCalendar() {
+            const calendar = document.getElementById('calendar');
+            calendar.innerHTML = '';
+            
+            // 创建表头
+            const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+            const header = document.createElement('div');
+            header.className = 'calendar-header';
+            weekdays.forEach(day => {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'calendar-day-header';
+                dayCell.textContent = day;
+                header.appendChild(dayCell);
+            });
+            calendar.appendChild(header);
+            
+            // 创建日期网格
+            const grid = document.createElement('div');
+            grid.className = 'calendar-grid';
+            
+            // 获取今天的日期
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayDateStr = formatDateForStorage(today);
+            
+            // 计算当周周一的日期
+            const currentDay = today.getDay(); // 0=周日, 1=周一, ..., 6=周六
+            const daysToMonday = currentDay === 0 ? 6 : currentDay - 1; // 如果是周日，需要往前6天；否则往前(currentDay-1)天
+            const mondayDate = new Date(today);
+            mondayDate.setDate(today.getDate() - daysToMonday);
+            
+            // 从当周周一开始，生成35个日期（5行 x 7列）
+            const startDate = new Date(mondayDate);
+            const currentDate = new Date(startDate);
+            
+            for (let i = 0; i < 35; i++) {
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const date = String(currentDate.getDate()).padStart(2, '0');
+                const dateStr = `${month}.${date}`;
+                const dateKey = formatDateForStorage(currentDate);
+                
+                const cell = document.createElement('div');
+                cell.className = 'calendar-cell';
+                
+                // 如果是今天，添加特殊样式
+                if (dateKey === todayDateStr) {
+                    cell.classList.add('today');
+                    cell.innerHTML = `<span class="today-badge">今天</span><span class="date-number">${dateStr}</span>`;
+                } else {
+                    cell.textContent = dateStr;
+                }
+                
+                cell.setAttribute('data-date', dateKey);
+                cell.setAttribute('data-display', dateStr);
+                
+                cell.addEventListener('click', function() {
+                    // 移除之前的选中状态
+                    document.querySelectorAll('.calendar-cell').forEach(c => {
+                        c.classList.remove('selected');
+                    });
+                    // 添加当前选中状态
+                    this.classList.add('selected');
+                    
+                    const dateKey = this.getAttribute('data-date');
+                    const displayDate = this.getAttribute('data-display');
+                    showTodoDetail(dateKey, displayDate);
+                });
+                
+                grid.appendChild(cell);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            calendar.appendChild(grid);
+        }
+        
+        function formatDateForStorage(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function showTodoDetail(dateStr, displayDate) {
+            currentSelectedDate = dateStr;
+            
+            // 解析日期显示星期几
+            const date = new Date(dateStr);
+            const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            const weekday = weekdays[date.getDay()];
+            
+            document.getElementById('selected-date-title').textContent = displayDate;
+            document.getElementById('todo-date-subtitle').textContent = weekday;
+            
+            // 从 localStorage 加载任务
+            const todos = JSON.parse(localStorage.getItem(`todos-${dateStr}`) || '[]');
+            
+            // 显示任务列表
+            document.getElementById('todo-detail').style.display = 'block';
+            renderTodoList(todos);
+            
+            // 根据解锁状态显示/隐藏编辑功能
+            updateEditMode();
+        }
+        
+        function updateEditMode() {
+            const lockSection = document.getElementById('todo-lock-section');
+            const inputSection = document.getElementById('todo-input-section');
+            
+            if (isTodoUnlocked) {
+                // 已解锁：显示输入框，隐藏解锁按钮
+                lockSection.style.display = 'none';
+                inputSection.style.display = 'flex';
+            } else {
+                // 未解锁：显示解锁按钮，隐藏输入框
+                lockSection.style.display = 'block';
+                inputSection.style.display = 'none';
+            }
+        }
+        
+        function renderTodoList(todos) {
+            const todoList = document.getElementById('todo-list');
+            todoList.innerHTML = '';
+            
+            if (todos.length === 0) {
+                // 如果没有任务，显示空状态提示
+                const emptyState = document.createElement('div');
+                emptyState.className = 'todo-empty-state';
+                if (isTodoUnlocked) {
+                    emptyState.innerHTML = `
+                        <div class="empty-icon">📝</div>
+                        <p>还没有任务，添加一个吧～</p>
+                    `;
+                } else {
+                    emptyState.innerHTML = `
+                        <div class="empty-icon">📝</div>
+                        <p>还没有任务</p>
+                        <p style="font-size: 14px; color: #999; margin-top: 8px;">解锁后可添加任务</p>
+                    `;
+                }
+                todoList.appendChild(emptyState);
+            } else {
+                todos.forEach((todo, index) => {
+                    const li = document.createElement('li');
+                    li.className = todo.completed ? 'completed' : '';
+                    
+                    // 使用图标显示任务状态
+                    const statusIcon = todo.completed ? '✅' : '⭕';
+                    const statusClass = todo.completed ? 'todo-completed' : 'todo-pending';
+                    
+                    // 如果未解锁，图标和删除按钮不可点击
+                    const clickable = isTodoUnlocked ? `onclick="toggleTodo(${index})"` : '';
+                    const deleteBtn = isTodoUnlocked 
+                        ? `<button class="delete-btn" onclick="deleteTodo(${index})" title="删除任务">🗑️</button>`
+                        : '';
+                    
+                    li.innerHTML = `
+                        <span class="todo-status-icon ${statusClass} ${!isTodoUnlocked ? 'readonly' : ''}" ${clickable}>${statusIcon}</span>
+                        <span class="todo-text">${todo.text}</span>
+                        ${deleteBtn}
+                    `;
+                    todoList.appendChild(li);
+                });
+            }
+        }
+        
+        function toggleTodo(index) {
+            if (!currentSelectedDate || !isTodoUnlocked) return;
+            const todos = JSON.parse(localStorage.getItem(`todos-${currentSelectedDate}`) || '[]');
+            if (todos[index]) {
+                todos[index].completed = !todos[index].completed;
+                localStorage.setItem(`todos-${currentSelectedDate}`, JSON.stringify(todos));
+                renderTodoList(todos);
+            }
+        }
+        
+        function deleteTodo(index) {
+            if (!currentSelectedDate || !isTodoUnlocked) return;
+            const todos = JSON.parse(localStorage.getItem(`todos-${currentSelectedDate}`) || '[]');
+            todos.splice(index, 1);
+            localStorage.setItem(`todos-${currentSelectedDate}`, JSON.stringify(todos));
+            renderTodoList(todos);
+        }
+        
+        // 解锁按钮点击事件
+        document.getElementById('unlock-todo-btn').addEventListener('click', function() {
+            document.getElementById('todo-password-modal').style.display = 'flex';
+            document.getElementById('todo-password-input').focus();
+        });
+        
+        // 密码输入框回车确认
+        document.getElementById('todo-password-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('todo-password-confirm').click();
+            }
+        });
+        
+        // 确认按钮
+        document.getElementById('todo-password-confirm').addEventListener('click', function() {
+            const password = document.getElementById('todo-password-input').value;
+            const errorMsg = document.getElementById('todo-error-message');
+            
+            if (password === TODO_PASSWORD) {
+                isTodoUnlocked = true;
+                sessionStorage.setItem('todo-unlocked', 'true');
+                document.getElementById('todo-password-modal').style.display = 'none';
+                document.getElementById('todo-password-input').value = '';
+                errorMsg.style.display = 'none';
+                updateEditMode();
+                // 重新渲染任务列表以显示编辑功能
+                if (currentSelectedDate) {
+                    const todos = JSON.parse(localStorage.getItem(`todos-${currentSelectedDate}`) || '[]');
+                    renderTodoList(todos);
+                }
+            } else {
+                errorMsg.style.display = 'block';
+                document.getElementById('todo-password-input').value = '';
+                document.getElementById('todo-password-input').focus();
+            }
+        });
+        
+        // 取消按钮
+        document.getElementById('todo-password-cancel').addEventListener('click', function() {
+            document.getElementById('todo-password-modal').style.display = 'none';
+            document.getElementById('todo-password-input').value = '';
+            document.getElementById('todo-error-message').style.display = 'none';
+        });
+        
+        // 添加任务
+        document.getElementById('add-todo-btn').addEventListener('click', function() {
+            if (!currentSelectedDate || !isTodoUnlocked) {
+                return;
+            }
+            
+            const input = document.getElementById('new-todo');
+            const text = input.value.trim();
+            if (text) {
+                const todos = JSON.parse(localStorage.getItem(`todos-${currentSelectedDate}`) || '[]');
+                todos.push({ text: text, completed: false });
+                localStorage.setItem(`todos-${currentSelectedDate}`, JSON.stringify(todos));
+                renderTodoList(todos);
+                input.value = '';
+            }
+        });
+        
+        // 回车添加任务
+        document.getElementById('new-todo').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && isTodoUnlocked) {
+                document.getElementById('add-todo-btn').click();
+            }
+        });
+        
+        // 初始化编辑模式
+        updateEditMode();
+        
+        generateCalendar();
+    </script>
+</body>
+</html>
+

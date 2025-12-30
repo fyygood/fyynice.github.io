@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>饭歪歪 - 首页</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <img src="images/image1.jpg" alt="头像" class="header-avatar">
+            <h1>饭歪歪</h1>
+            <span class="house-icon">🏠</span>
+        </div>
+        <nav class="header-nav">
+            <a href="index.html" class="nav-item active">首页</a>
+            <a href="log.html" class="nav-item">日志</a>
+            <a href="todo.html" class="nav-item">to do</a>
+            <a href="growth.html" class="nav-item">成长</a>
+            <a href="thought.html" class="nav-item">思考</a>
+        </nav>
+    </header>
+
+    <main class="home-main">
+        <div class="home-content">
+            <div class="avatar-section">
+                <div class="avatar-circle" id="avatar-circle">
+                    <!-- 头像内容将通过JavaScript设置 -->
+                </div>
+            </div>
+            <div class="profile-section">
+                <div id="profile-text" class="profile-text-display">这里是饭歪歪的🏠，<br>记录一些个人经历和思考。<br>记录一些美好的爱情！<br>希望能成为一个做点小事有点小用的人吧！<br>祝看到的大家都前程似锦🎉</div>
+            </div>
+        </div>
+    </main>
+    
+    <footer class="home-footer">
+        <p class="welcome-text">欢迎来到饭歪歪的个人空间</p>
+        <p class="contact-text">联系: 1726612689@qq.com</p>
+        <p class="copyright-text">上次编辑于 <span id="last-edit-date"></span> 版权归@饭歪歪所有</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script>
+        // 设置最后编辑日期（格式：2025-12-29）
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        document.getElementById('last-edit-date').textContent = `${year}-${month}-${day}`;
+        
+        // 头像内容（在代码中设置）
+        const avatarCircle = document.getElementById('avatar-circle');
+        // 方式1: 使用图片URL（推荐）
+        const avatarImageUrl = 'images/image1.jpg'; // 在这里设置头像图片URL，例如：'images/avatar.jpg' 或 'https://example.com/avatar.jpg'
+        // 方式2: 使用占位文本
+        const avatarPlaceholder = '头像'; // 如果没有图片URL，将显示此文本
+        
+        if (avatarImageUrl) {
+            avatarCircle.innerHTML = `<img src="${avatarImageUrl}" alt="头像" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+        } else {
+            avatarCircle.innerHTML = `<p>${avatarPlaceholder}</p>`;
+        }
+        
+        // 个人简介内容已在HTML中设置，无需JavaScript修改
+    </script>
+</body>
+</html>
+
