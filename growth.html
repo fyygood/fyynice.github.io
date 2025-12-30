@@ -24,50 +24,8 @@
 
     <main class="growth-main">
         <aside class="growth-sidebar">
-            <div class="category-list">
-                <div class="category-item">
-                    <div class="category-title">生日</div>
-                    <div class="subcategory">
-                        <div class="subcategory-item" data-file="birthday-family.md">家庭</div>
-                        <div class="subcategory-item" data-file="birthday-sick.md">生病</div>
-                        <div class="subcategory-item" data-file="birthday-play.md">出去玩</div>
-                    </div>
-                </div>
-                <div class="category-item">
-                    <div class="category-title">小学</div>
-                    <div class="subcategory">
-                        <div class="subcategory-item" data-file="primary-xinghua.md">兴华小学</div>
-                        <div class="subcategory-item" data-file="primary-qianxian.md">乾县某小学</div>
-                        <div class="subcategory-item" data-file="primary-shaanshida.md">陕师大附小</div>
-                    </div>
-                </div>
-                <div class="category-item">
-                    <div class="category-title">初中</div>
-                    <div class="subcategory">
-                        <div class="subcategory-item" data-file="middle-xigongda.md">西工大附中</div>
-                    </div>
-                </div>
-                <div class="category-item">
-                    <div class="category-title">高中</div>
-                    <div class="subcategory">
-                        <div class="subcategory-item" data-file="high-xigongda.md">西工大附中</div>
-                    </div>
-                </div>
-                <div class="category-item">
-                    <div class="category-title">大学</div>
-                    <div class="subcategory">
-                        <div class="subcategory-item" data-file="university-zhejiang.md">浙江大学</div>
-                    </div>
-                </div>
-                <div class="category-item">
-                    <div class="category-title">工作</div>
-                    <div class="subcategory">
-                        <div class="subcategory-item" data-file="work.md">工作经历</div>
-                    </div>
-                </div>
-                <div class="category-item">
-                    <div class="category-title">......</div>
-                </div>
+            <div class="category-list" id="category-list">
+                <!-- 分类列表将通过 JavaScript 动态生成 -->
             </div>
         </aside>
         <div class="growth-content">
@@ -102,21 +60,154 @@
         const PASSWORD = '0714'; // 静态密码
         let isUnlocked = false;
         
-        // 检查是否已经解锁（使用 sessionStorage）
-        if (sessionStorage.getItem('growth-unlocked') === 'true') {
-            isUnlocked = true;
-            // 如果已解锁，直接显示 markdown 内容区域，不显示欢迎信息
-            document.getElementById('lock-screen').style.display = 'none';
-            document.getElementById('welcome-message').style.display = 'none';
-            document.getElementById('markdown-content').style.display = 'block';
-            // 移除模糊效果
-            document.querySelectorAll('.subcategory-item').forEach(item => {
-                item.classList.remove('blurred');
-                item.style.opacity = '1';
-                item.style.cursor = 'pointer';
+        // 文件前缀到一级标题的映射关系
+        const categoryMapping = {
+            'birthday-': '生日',
+            'primary-': '小学',
+            'middle-': '初中',
+            'high-': '高中',
+            'university-': '大学',
+            'work': '工作'
+        };
+        
+        // 一级标题的顺序
+        const categoryOrder = ['生日', '小学', '初中', '高中', '大学', '工作'];
+        
+        // 动态生成分类列表
+        async function generateCategoryList() {
+            const categoryList = document.getElementById('category-list');
+            const filesByCategory = {};
+            
+            // 初始化分类
+            categoryOrder.forEach(category => {
+                filesByCategory[category] = [];
             });
-            enableMenuItems();
+            
+            // 检测文件并获取标题
+            async function checkAndGetFileInfo(filename) {
+                const path = `markdown/growth/${filename}`;
+                try {
+                    const response = await fetch(path);
+                    if (response.ok) {
+                        const text = await response.text();
+                        // 提取第一行作为标题（去除 # 和空格）
+                        const firstLine = text.split('\n')[0].trim();
+                        let title = firstLine.startsWith('#') 
+                            ? firstLine.substring(1).trim() 
+                            : firstLine;
+                        // 如果标题为空，使用文件名（去除扩展名）
+                        if (!title || title.length === 0) {
+                            title = filename.replace('.md', '');
+                        }
+                        return { filename, title, path };
+                    }
+                } catch (error) {
+                    // 文件不存在或加载失败
+                }
+                return null;
+            }
+            
+            // 检测所有可能的文件
+            const allPossibleFiles = [
+                // 生日
+                'birthday-family.md', 'birthday-sick.md', 'birthday-play.md',
+                // 小学
+                'primary-xinghua.md', 'primary-qianxian.md', 'primary-shaanshida.md',
+                // 初中
+                'middle-xigongda.md',
+                // 高中
+                'high-xigongda.md',
+                // 大学
+                'university-zhejiang.md',
+                // 工作
+                'work.md'
+            ];
+            
+            // 并行检测所有文件
+            const checkPromises = allPossibleFiles.map(filename => checkAndGetFileInfo(filename));
+            const results = await Promise.all(checkPromises);
+            
+            // 按分类组织文件
+            results.forEach(result => {
+                if (result) {
+                    const filename = result.filename;
+                    // 根据文件名前缀确定分类
+                    for (const [prefix, category] of Object.entries(categoryMapping)) {
+                        if (filename.startsWith(prefix)) {
+                            filesByCategory[category].push(result);
+                            break;
+                        }
+                    }
+                }
+            });
+            
+            // 生成分类列表HTML
+            categoryOrder.forEach(category => {
+                const files = filesByCategory[category];
+                if (files.length === 0) return; // 如果该分类下没有文件，跳过
+                
+                const categoryItem = document.createElement('div');
+                categoryItem.className = 'category-item';
+                
+                const categoryTitle = document.createElement('div');
+                categoryTitle.className = 'category-title';
+                categoryTitle.textContent = category;
+                categoryItem.appendChild(categoryTitle);
+                
+                const subcategory = document.createElement('div');
+                subcategory.className = 'subcategory';
+                
+                files.forEach(({ filename, title, path }) => {
+                    const subcategoryItem = document.createElement('div');
+                    subcategoryItem.className = 'subcategory-item';
+                    subcategoryItem.textContent = title;
+                    subcategoryItem.setAttribute('data-file', filename);
+                    subcategory.appendChild(subcategoryItem);
+                });
+                
+                categoryItem.appendChild(subcategory);
+                categoryList.appendChild(categoryItem);
+            });
+            
+            // 添加省略号
+            const ellipsisItem = document.createElement('div');
+            ellipsisItem.className = 'category-item';
+            const ellipsisTitle = document.createElement('div');
+            ellipsisTitle.className = 'category-title';
+            ellipsisTitle.textContent = '......';
+            ellipsisItem.appendChild(ellipsisTitle);
+            categoryList.appendChild(ellipsisItem);
         }
+        
+        // 页面加载时生成分类列表，然后设置菜单项状态
+        generateCategoryList().then(() => {
+            // 检查是否已经解锁（使用 sessionStorage）
+            if (sessionStorage.getItem('growth-unlocked') === 'true') {
+                isUnlocked = true;
+                // 如果已解锁，直接显示 markdown 内容区域，不显示欢迎信息
+                document.getElementById('lock-screen').style.display = 'none';
+                document.getElementById('welcome-message').style.display = 'none';
+                document.getElementById('markdown-content').style.display = 'block';
+                // 移除模糊效果
+                document.querySelectorAll('.subcategory-item').forEach(item => {
+                    item.classList.remove('blurred');
+                    item.style.opacity = '1';
+                    item.style.cursor = 'pointer';
+                });
+                enableMenuItems();
+            } else {
+                // 如果未解锁，禁用菜单项并添加模糊效果
+                document.querySelectorAll('.subcategory-item').forEach(item => {
+                    item.classList.add('blurred');
+                    item.style.cursor = 'not-allowed';
+                    item.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        alert('请先解锁页面');
+                    });
+                });
+            }
+        });
         
         // 密码输入框实时检测密码（仅用于隐藏错误信息）
         const passwordInput = document.getElementById('password-input');
@@ -229,20 +320,6 @@
             });
         }
         
-        // 如果未解锁，禁用菜单项并添加模糊效果
-        if (!isUnlocked) {
-            document.querySelectorAll('.subcategory-item').forEach(item => {
-                item.classList.add('blurred');
-                item.style.cursor = 'not-allowed';
-                item.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    alert('请先解锁页面');
-                });
-            });
-        } else {
-            enableMenuItems();
-        }
         
         function loadMarkdown(path) {
             fetch(path)
