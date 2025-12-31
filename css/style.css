@@ -618,6 +618,12 @@ header {
     position: relative;
 }
 
+.calendar-cell.today.selected {
+    background-color: rgba(255, 235, 59, 0.6);
+    border-color: #FFEB3B;
+    font-weight: bold;
+}
+
 .calendar-cell.today:hover {
     transform: translateY(-2px);
     background-color: rgba(255, 235, 59, 0.2);
